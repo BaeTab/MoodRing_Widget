@@ -1,7 +1,7 @@
 // 프로젝트: Mood Ring 위젯
 // 파일: MoodService.cs
 // 설명: 시스템 스냅샷 → 종합 점수(CompositeScore) 계산, EMA 스무딩, 점수→색상 매핑.
-//       배터리 상태에 따른 점수 보정 적용.
+//       배터리 상태에 따른 점수 보정 적용. 색상 반응성을 높이기 위해 Raw(즉시) 점수도 보관.
 // 후원: 토스뱅크 1001-2269-0600
 // ----------------------------------------------------------------------------------
 using Mood_Ring.Helpers;
@@ -12,9 +12,10 @@ namespace Mood_Ring.Services;
 
 public class MoodService
 {
-    private double? _ema; // EMA 누적값 (null이면 초기화 필요)
+    private double? _ema;                 // EMA 누적값 (null이면 초기화 필요)
+    public double LastRawScore { get; private set; } // 최근 계산된 즉시(raw) 점수 (보정+클램프 후, EMA 적용 전)
 
-    // 점수 구간별 색상 스톱 (HSV 보간 대상). 색상 값: Tailwind 계열 청록→라임→주황→레드
+    // 점수 구간별 색상 스톱 (HSV 보간 대상)
     private readonly (double pos, System.Windows.Media.Color color)[] _stops = new[]
     {
         (0.0,  (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#2dd4bf")!),
@@ -26,30 +27,31 @@ public class MoodService
 
     public double ComputeComposite(SystemSnapshot s, Models.Settings settings)
     {
-        // 가중합 (각 메트릭은 0~100 범위)
-        double score = s.CpuUsage * settings.CpuWeight +
-                       s.MemoryUsage * settings.MemoryWeight +
-                       s.DiskBusy * settings.DiskWeight +
-                       s.NetworkLoad * settings.NetworkWeight;
+        // 가중합 (각 메트릭 0~100)
+        double raw = s.CpuUsage * settings.CpuWeight +
+                     s.MemoryUsage * settings.MemoryWeight +
+                     s.DiskBusy * settings.DiskWeight +
+                     s.NetworkLoad * settings.NetworkWeight;
 
-        // 배터리 보정: 충전 중이면 -5, 20% 미만이면 +10 (과열/저전력 느낌)
+        // 배터리 보정
         if (settings.BatteryAdjustment)
         {
-            if (s.IsCharging) score -= 5;
-            else if (s.BatteryPercent < 20) score += 10;
+            if (s.IsCharging) raw -= 5;
+            else if (s.BatteryPercent < 20) raw += 10;
         }
 
-        // 범위 클램프
-        score = score < 0 ? 0 : (score > 100 ? 100 : score);
+        // 클램프 → Raw 점수 저장 (색상 즉시 반응에 사용)
+        raw = raw < 0 ? 0 : (raw > 100 ? 100 : raw);
+        LastRawScore = raw; // 색상은 EMA 대신 이 값을 사용하여 민감하게 반응
 
-        // EMA 적용: ema = α*현재 + (1-α)*이전 (초기엔 현재값 채택)
-        _ema = _ema is null ? score : settings.Alpha * score + (1 - settings.Alpha) * _ema.Value;
-        return _ema.Value;
+        // EMA 적용으로 수치 표기 안정화 (시각적 점수 숫자 흔들림 감소)
+        _ema = _ema is null ? raw : settings.Alpha * raw + (1 - settings.Alpha) * _ema.Value;
+        return _ema.Value; // 반환값은 "스무딩 점수" (CompositeScore)
     }
 
+    // value(0~100)에 대한 HSV 보간 브러시 (즉시 점수 전달 권장)
     public SolidColorBrush GetBrush(double value)
     {
-        // 구간 찾기 → HSV 보간 → Freezable Brush 반환
         if (value <= _stops[0].pos) return Frozen(_stops[0].color);
         for (int i = 1; i < _stops.Length; i++)
         {
@@ -68,7 +70,7 @@ public class MoodService
     private SolidColorBrush Frozen(System.Windows.Media.Color c)
     {
         var b = new SolidColorBrush(c);
-        b.Freeze(); // Freezable → 성능 최적화 (GC, 렌더 부하 감소)
+        b.Freeze(); // Freezable → 성능 최적화
         return b;
     }
 }
