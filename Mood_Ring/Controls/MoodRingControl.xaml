@@ -15,7 +15,12 @@
                 <BeginStoryboard Storyboard="{StaticResource PulseStoryboard}" />
             </EventTrigger>
         </Grid.Triggers>
-        <Ellipse StrokeThickness="8" Stroke="#303030" Opacity="0.35" />
+        <Ellipse StrokeThickness="8" Stroke="#303030" Opacity="0.38" />
+        <Ellipse x:Name="InnerBackdrop" Margin="16" Fill="#BF0F1114" Stroke="#22000000" StrokeThickness="1">
+            <Ellipse.Effect>
+                <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#80000000" Opacity="0.35" />
+            </Ellipse.Effect>
+        </Ellipse>
         <Ellipse x:Name="Glow" StrokeThickness="8" Stroke="{Binding RingBrush}" Opacity="0.40">
             <Ellipse.Effect>
                 <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.8" Color="#40000000" />

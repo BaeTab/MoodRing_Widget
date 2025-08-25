@@ -23,6 +23,8 @@ public partial class RingWindow : Window
     private readonly DispatcherTimer _timer;                     // 메트릭 업데이트 타이머
     private readonly DispatcherTimer _fadeTimer;                 // 자동 투명도 타이머
 
+    private double _targetOpacity = 1.0;                         // 페이드 목표값 (가독성 강화 위해 최소 0.85)
+
     public RingWindow()
     {
         InitializeComponent();
@@ -47,7 +49,7 @@ public partial class RingWindow : Window
         MouseLeftButtonUp += (_, __) => { if (!SettingsLocked) { SaveSettings(); } }; // 드래그 종료 시 위치 저장
         MouseDown += (_, e) => { if (e.ClickCount == 2) { _vm.ToggleDisplayMode(); SaveSettings(); } }; // 더블클릭 표시 모드 순환
 
-        // 자동 페이드 (마우스 근접=1.0 / 원거리=0.7) - 500ms 주기 점진 보간
+        // 자동 페이드 (마우스 근접=1.0 / 원거리=0.85) - 500ms 주기 점진 보간
         _fadeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _fadeTimer.Tick += FadeTimerOnTick;
         _fadeTimer.Start();
@@ -61,8 +63,8 @@ public partial class RingWindow : Window
             double dx = p.X - (Left + Width / 2);
             double dy = p.Y - (Top + Height / 2);
             double dist = Math.Sqrt(dx * dx + dy * dy);
-            double target = dist < Width * 0.9 ? 1.0 : 0.7; // 근접 임계치 비율 (실험적)
-            Opacity = Opacity + (target - Opacity) * 0.25;  // 간단한 이징 (지수 감쇠)
+            _targetOpacity = dist < Width * 0.9 ? 1.0 : 0.85; // 최소값 0.85로 상향 (가독성 개선)
+            Opacity = Opacity + (_targetOpacity - Opacity) * 0.25;  // 간단한 이징
         }
         catch { }
     }
