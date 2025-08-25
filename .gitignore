@@ -1,0 +1,94 @@
+# ------------------------------
+# Mood Ring /.NET / WPF .gitignore
+# Generated for non-commercial project
+# ------------------------------
+
+# Build artifacts
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+TestResults/
+
+# VS / Rider / Code tooling
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+.vscode/
+
+# NuGet / packages
+packages/
+*.nupkg
+*.snupkg
+# lock files (keep if you intentionally commit)
+project.lock.json
+
+# Cache
+*.cache
+*.log
+
+# Generated code
+Generated*/
+
+# Publish outputs
+publish/
+[Pp]ublish*/
+
+# Temporary
+*.tmp
+*.temp
+~$*
+*.bak
+
+# Resharper / analyzers
+_ReSharper.Caches/
+*.resharper
+
+# StyleCop caches
+StyleCopReport.xml
+
+# Rider
+.idea/
+*.iml
+
+# DotCover / Coverage
+*.dotCover
+coverage*/
+reports/
+
+# OS
+[Dd]esktop.ini
+[Tt]humbs.db
+.DS_Store
+
+# WPF auto-generated (keep *.g.cs if needed for debugging)
+*.g.cs
+*.g.i.cs
+
+# Local settings / secrets (none currently stored in repo)
+secrets.json
+
+# App data (runtime) - settings are stored in %AppData% outside repo
+# (If later you add local development overrides, whitelist explicitly.)
+
+# Crash / dumps
+*.dmp
+
+# Rider / JetBrains additional
+.jetbrains/
+
+# Terraform / infra (future-proof)
+*.tfstate
+
+# Node (if you add web assets later)
+node_modules/
+
+# Images generated for README (keep originals in docs/images)
+*.psd
+*.ai
+
+# End

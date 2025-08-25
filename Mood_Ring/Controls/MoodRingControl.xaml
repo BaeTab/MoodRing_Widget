@@ -1,0 +1,32 @@
+<UserControl x:Class="Mood_Ring.Controls.MoodRingControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" MinWidth="60" MinHeight="60">
+    <Grid>
+        <Grid.Resources>
+            <Storyboard x:Key="PulseStoryboard" RepeatBehavior="Forever" Duration="0:0:3" AutoReverse="True">
+                <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity" From="0.25" To="0.5" Duration="0:0:1.5" />
+            </Storyboard>
+        </Grid.Resources>
+        <Grid.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+                <BeginStoryboard Storyboard="{StaticResource PulseStoryboard}" />
+            </EventTrigger>
+        </Grid.Triggers>
+        <Ellipse StrokeThickness="8" Stroke="#303030" Opacity="0.35" />
+        <Ellipse x:Name="Glow" StrokeThickness="8" Stroke="{Binding RingBrush}" Opacity="0.40">
+            <Ellipse.Effect>
+                <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.8" Color="#40000000" />
+            </Ellipse.Effect>
+        </Ellipse>
+        <Grid>
+            <Grid.RenderTransform>
+                <RotateTransform Angle="-90" />
+            </Grid.RenderTransform>
+            <Path x:Name="ProgressPath" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stroke="{Binding RingBrush}" Data="M50,0" />
+        </Grid>
+        <TextBlock Text="{Binding DisplayText}" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="18" FontFamily="Segoe UI Emoji, Segoe UI Symbol, Segoe UI"/>
+    </Grid>
+</UserControl>
