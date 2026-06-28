@@ -4,6 +4,11 @@ A lightweight, always-on-top desktop **mood ring** for Windows. It samples your 
 
 Built with **WPF on .NET 8**. Frameless, transparent, draggable, and tucked into the system tray.
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="Mood Ring widget — Sunset theme with the hover detail panel showing CPU/MEM/DISK/NET bars and a score sparkline" width="260" />
+</p>
+<p align="center"><sub>Sunset theme · score 35 (Calm) · hover detail panel with per-metric bars + sparkline</sub></p>
+
 > 💛 **Support / 후원:** Toss Bank `1001-2269-0600` — every little bit keeps this project alive.
 
 ---
