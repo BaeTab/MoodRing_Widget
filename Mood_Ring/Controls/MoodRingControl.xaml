@@ -5,33 +5,63 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" MinWidth="60" MinHeight="60">
     <Grid>
-        <Grid.Resources>
-            <Storyboard x:Key="PulseStoryboard" RepeatBehavior="Forever" Duration="0:0:3" AutoReverse="True">
-                <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity" From="0.25" To="0.5" Duration="0:0:1.5" />
-            </Storyboard>
-        </Grid.Resources>
-        <Grid.Triggers>
-            <EventTrigger RoutedEvent="Loaded">
-                <BeginStoryboard Storyboard="{StaticResource PulseStoryboard}" />
-            </EventTrigger>
-        </Grid.Triggers>
-        <Ellipse StrokeThickness="8" Stroke="#303030" Opacity="0.38" />
-        <Ellipse x:Name="InnerBackdrop" Margin="16" Fill="#BF0F1114" Stroke="#22000000" StrokeThickness="1">
+        <!-- 배경 트랙 링 -->
+        <Ellipse x:Name="Track" StrokeThickness="9" Stroke="#2A3340" Opacity="0.6" />
+
+        <!-- 눈금(틱) — 코드에서 Geometry 생성 -->
+        <Path x:Name="Ticks" Stroke="#46556B" StrokeThickness="1.5" Opacity="0.55" />
+
+        <!-- 중앙 백드롭 (텍스트 가독성용 반투명 디스크) -->
+        <Ellipse x:Name="InnerBackdrop" Margin="17" Fill="#C20E1116" Stroke="#1FFFFFFF" StrokeThickness="1">
             <Ellipse.Effect>
-                <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#80000000" Opacity="0.35" />
+                <DropShadowEffect BlurRadius="12" ShadowDepth="0" Color="#000000" Opacity="0.55" />
             </Ellipse.Effect>
         </Ellipse>
-        <Ellipse x:Name="Glow" StrokeThickness="8" Stroke="{Binding RingBrush}" Opacity="0.40">
+
+        <!-- 글로우 (호흡 펄스 + 점수 기반 강도) -->
+        <Ellipse x:Name="Glow" StrokeThickness="10" Opacity="0.4" RenderTransformOrigin="0.5,0.5">
+            <Ellipse.RenderTransform>
+                <ScaleTransform x:Name="GlowScale" ScaleX="1" ScaleY="1" />
+            </Ellipse.RenderTransform>
             <Ellipse.Effect>
-                <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.8" Color="#40000000" />
+                <BlurEffect x:Name="GlowBlur" Radius="16" />
             </Ellipse.Effect>
         </Ellipse>
-        <Grid>
-            <Grid.RenderTransform>
-                <RotateTransform Angle="-90" />
-            </Grid.RenderTransform>
-            <Path x:Name="ProgressPath" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stroke="{Binding RingBrush}" Data="M50,0" />
-        </Grid>
-        <TextBlock Text="{Binding DisplayText}" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="18" FontFamily="Segoe UI Emoji, Segoe UI Symbol, Segoe UI"/>
+
+        <!-- 과열 시 회전 샤이머(점선 링) -->
+        <Ellipse x:Name="Shimmer" Margin="2" StrokeThickness="2" Stroke="#99FFFFFF"
+                 StrokeDashArray="1 7" StrokeDashCap="Round" Opacity="0" RenderTransformOrigin="0.5,0.5">
+            <Ellipse.RenderTransform>
+                <RotateTransform x:Name="ShimmerRot" Angle="0" />
+            </Ellipse.RenderTransform>
+        </Ellipse>
+
+        <!-- 진행 아크 (12시 시작, 시계방향) -->
+        <Path x:Name="ProgressPath" StrokeThickness="9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+        <!-- 위에 얹는 하이라이트 시언 -->
+        <Path x:Name="SheenPath" StrokeThickness="2.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+              Stroke="#73FFFFFF" Opacity="0.55" />
+
+        <!-- 아크 끝 코멧(빛나는 점) -->
+        <Ellipse x:Name="Comet" Width="13" Height="13" HorizontalAlignment="Left" VerticalAlignment="Top"
+                 Visibility="Collapsed">
+            <Ellipse.Effect>
+                <BlurEffect Radius="6" />
+            </Ellipse.Effect>
+        </Ellipse>
+
+        <!-- 중앙 텍스트 + 라벨 -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock x:Name="ValueText" Text="{Binding DisplayText}" Foreground="White"
+                       HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="19"
+                       FontFamily="Segoe UI Emoji, Segoe UI Symbol, Segoe UI">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#000000" Opacity="0.7" />
+                </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock x:Name="LabelText" Text="{Binding MoodLabel}" Foreground="#B8C6D8"
+                       HorizontalAlignment="Center" FontSize="9.5" FontWeight="Medium"
+                       Margin="0,1,0,0" Opacity="0.85" />
+        </StackPanel>
     </Grid>
 </UserControl>

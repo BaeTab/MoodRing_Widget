@@ -1,69 +1,166 @@
-# Mood Ring 위젯 (WPF / .NET 8)
+# Mood Ring Widget
 
-가벼운 시스템 상태 감성 표시 위젯. CPU / 메모리 / 디스크 / 네트워크 / 배터리 정보를 가중 합산해 0~100 점수(CompositeScore)를 만들고, 부드러운 색상 링(HSV 보간)으로 "무드"를 표현합니다.
+A lightweight, always-on-top desktop **mood ring** for Windows. It samples your system load (CPU / memory / disk / network / battery), blends it into a single **composite score (0–100)**, and expresses that "mood" as a smoothly animated color ring — calm teal when idle, glowing red when your machine is on fire. 🔥
 
-> 후원 / Support: 토스뱅크 1001-2269-0600 (개발 지속에 큰 힘이 됩니다.)
+Built with **WPF on .NET 8**. Frameless, transparent, draggable, and tucked into the system tray.
+
+> 💛 **Support / 후원:** Toss Bank `1001-2269-0600` — every little bit keeps this project alive.
 
 ---
-## 주요 기능
-- 프레임리스, 투명, TopMost 원형 링 위젯 (드래그 이동 / 크기(휠) 조절 / 잠금)
-- CPU(40) + Memory(30) + Disk(15) + Network(15) 가중 종합 점수
-- 배터리: 충전 중 -5 / 20% 미만 +10 보정 (옵션)
-- EMA(α=0.2) 스무딩으로 급격한 변동 완화
-- 색상 맵: 청록(#2dd4bf) → 라임(#84cc16) → 주황(#fb923c) → 레드(#ef4444)
-- 표시 모드: Score / Emoji / Text (더블클릭 순환)
-- 자동 페이드: 마우스 멀어지면 투명도 0.7, 근접 시 1.0
-- 시스템 트레이 아이콘 및 컨텍스트 메뉴 (표시/숨김, 크기 프리셋, 잠금, 종료)
-- %AppData%/MoodRing/settings.json 에 설정 저장 (위치, 크기, 모드 등)
 
-## 구조
+## ✨ Highlights
+
+**Core**
+- Frameless, transparent, top-most circular ring widget
+- Composite score: `CPU·0.40 + MEM·0.30 + DISK·0.15 + NET·0.15`, with optional battery adjustment
+- EMA smoothing (adjustable) for the displayed number; **raw score** drives color/emoji for snappy reactivity
+
+**Visuals**
+- **5 color themes** — Aurora · Sunset · Neon · Ocean · Mono — interpolated in HSV across the score
+- **Eased color transitions** (`ColorAnimation`, ~360 ms) so the ring never "pops" between colors
+- **Reactive glow + breathing pulse** — the higher the load, the stronger the glow and the faster the pulse
+- A **comet** (glowing dot) trailing the progress arc, 60 tick marks, a highlight sheen, and a **rotating shimmer** when the mood hits *Heat*
+- Center **mood label**: `Calm → Focus → Busy → Heat`
+
+**Interaction**
+- Display modes: **Score / Emoji / Text** (double-click to cycle)
+- **Hover detail panel** — per-metric mini bars (CPU·MEM·DISK·NET) with live values + a **sparkline** of recent scores
+- **Settings window** — themes, display mode, weights, smoothing, interval, idle opacity, and toggles, all applied **live**
+- Drag to move · scroll wheel to resize · lock to pin in place
+
+**System**
+- **Auto-start** on Windows login (per-user `HKCU\…\Run`, no admin needed)
+- **Click-through** mode (mouse passes through the widget to windows beneath)
+- **Dynamic tray icon** colored by the current mood + context menu with live check states
+- Settings persisted to `%AppData%\MoodRing\settings.json`
+
+---
+
+## 🎨 Color themes
+
+| Theme  | Calm → Heat sweep                                   |
+|--------|-----------------------------------------------------|
+| Aurora | teal → lime → orange → red (default)                |
+| Sunset | indigo → magenta → pink → orange → gold             |
+| Neon   | cyan → mint → yellow → rose → orchid                |
+| Ocean  | sky → cyan → teal → amber → red                     |
+| Mono   | slate → silver → white → amber → coral (low-key)    |
+
+Each theme maps **low load = cool/calm** and **high load = intense**, interpolated along the shortest HSV hue path.
+
+---
+
+## 🧮 Composite score
+
+1. Sample metrics via `PerformanceCounter` + `PowerStatus`
+2. Weighted sum: `CPU·w_cpu + MEM·w_mem + DISK·w_disk + NET·w_net` (weights configurable)
+3. Battery adjustment (optional): charging `−5`, below 20% `+10`
+4. Clamp to `0–100` → this **raw** score drives color, emoji, and the mood band
+5. EMA smoothing for the displayed number: `ema = α·raw + (1−α)·ema_prev`
+
+Network load is normalized against an **adaptively learned peak**, so "100%" tracks *your* machine's typical throughput rather than a fixed ceiling.
+
+---
+
+## 🖱️ Controls
+
+| Action                         | Result                                  |
+|--------------------------------|-----------------------------------------|
+| Drag                           | Move the widget                         |
+| Mouse wheel                    | Resize (90–220 px)                      |
+| Double-click                   | Cycle display mode (Score/Emoji/Text)   |
+| Hover                          | Show the detail panel                   |
+| Tray double-click              | Show / hide the widget                  |
+| Tray right-click               | Settings · Lock · Click-through · Auto-start · Size · Quit |
+
+When **locked**, drag/resize are disabled. When **click-through** is on, the widget ignores the mouse entirely.
+
+---
+
+## ⚙️ Settings
+
+Open via the tray menu → **설정… (Settings)**. Everything applies immediately and is saved to `settings.json`.
+
+| Setting            | Range / options                  | Notes                              |
+|--------------------|----------------------------------|------------------------------------|
+| Color theme        | Aurora / Sunset / Neon / Ocean / Mono | HSV-interpolated palette       |
+| Display mode       | Score / Emoji / Text             | Same as double-click cycle         |
+| Animate color      | on / off                         | Eased vs. instant color changes    |
+| Reactive glow      | on / off                         | Score-driven glow & pulse speed    |
+| Detail on hover    | on / off                         | Hover breakdown panel              |
+| Idle opacity       | 0.30 – 1.00                      | Opacity when the cursor is away    |
+| Battery adjustment | on / off                         | ±score based on charge state       |
+| Click-through      | on / off                         | Pass clicks to windows beneath     |
+| Auto-start         | on / off                         | `HKCU\…\Run` registry entry        |
+| Update interval    | 250 – 3000 ms                    | Metric sampling cadence            |
+| Smoothing (α)      | 0.05 – 0.60                      | Lower = smoother number            |
+| Weights            | CPU / MEM / DISK / NET (0 – 1)   | Composite-score contribution       |
+
+---
+
+## 🚀 Build & run
+
+Requires the **.NET 8 SDK** (Windows).
+
+```bash
+dotnet build Mood_Ring/Mood_Ring.csproj
+# then launch:
+Mood_Ring/bin/Debug/net8.0-windows/Mood_Ring.exe
+```
+
+Or open `Mood_Ring.sln` in Visual Studio / Rider and run.
+
+> **Encoding note:** all `.cs` sources are **UTF-8**. They contain Korean comments and UI strings — keep them UTF-8 (CP949/EUC-KR will corrupt tray menu text at compile time).
+
+---
+
+## 🧱 Architecture
+
 ```
 Mood_Ring/
  ├─ Models/        # Settings, SystemSnapshot
- ├─ Services/      # Metrics, Mood(점수/색), Settings 저장, Tray
- ├─ ViewModels/    # RingViewModel (바인딩 상태)
- ├─ Views/         # RingWindow (투명 위젯 창)
- ├─ Controls/      # MoodRingControl (아크/펄스/Glow)
- ├─ Helpers/       # ColorInterpolation (HSV 보간)
+ ├─ Services/      # Metrics (PerformanceCounter), Mood (score/color·themes),
+ │                 # Settings (JSON), Tray (dynamic icon + menu), Autostart (HKCU Run)
+ ├─ ViewModels/    # RingViewModel — score/color/glow/metrics/sparkline bindings
+ ├─ Views/         # RingWindow (widget + detail popup), SettingsWindow (settings panel)
+ ├─ Controls/      # MoodRingControl — arc/comet/ticks/pulse/glow/shimmer
+ ├─ Helpers/       # ColorInterpolation (HSV), NativeMethods (click-through / tool-window)
  ├─ README.md
  └─ LICENSE
 ```
 
-## Composite Score 계산 로직
-1. 메트릭 수집: PerformanceCounter + PowerStatus
-2. 가중합: CPU*0.40 + MEM*0.30 + DISK*0.15 + NET*0.15
-3. 배터리 보정: (충전 -5) / (20% 미만 +10)
-4. 0~100 클램프
-5. EMA 적용: ema = α * current + (1-α) * ema_prev (초기 prev는 current)
+MVVM with `CommunityToolkit.Mvvm`. The ring control owns an animatable brush so colors ease over time; the view model exposes the raw metrics and a derived mood band that the control turns into glow intensity, pulse speed, and shimmer.
 
-## 색상 전환 (HSV 보간)
-- 구간별 Anchor 색상 배열로 Value 위치 파악 후 HSV 선형 보간
-- ColorInterpolation.LerpHsv → H 최단 거리 회전
-- SolidColorBrush Freeze() 적용으로 UI 스레드 부담 최소화
+---
 
-## 빌드 & 실행
-.NET 8 SDK 설치 후:
-```
-dotnet build
-bin/Debug/net8.0-windows/Mood_Ring.exe
-```
-(또는 IDE에서 실행)
+## 🗺️ Roadmap
 
-## 향후 TODO
-- AutostartService (윈도우 시작 시 자동 실행)
-- 듀얼 모드(차분/집중) 색상/가중치 프로파일 전환
-- 배터리 잔여 시간 추정 및 표시 배지
-- 네트워크/디스크 예외 상황 재초기화 로직 (절전 복귀 등)
-- 색상 전환 애니메이션 (ColorAnimation, eased)
-- 글로우 강도 점수 기반 동적 반영
-- 접근성: 고대비 모드 감지 후 대비 최적화
+**Done (v2)**
+- ✅ Encoding fix: sources CP949 → UTF-8 (broken Korean tray menu resolved)
+- ✅ Auto-start service (`HKCU\…\Run`)
+- ✅ Eased color-transition animation
+- ✅ Score-driven glow intensity / pulse speed (+ Heat shimmer)
+- ✅ 5 color themes + live settings window
+- ✅ Hover detail panel (metric bars + score sparkline)
+- ✅ Click-through + mood-colored dynamic tray icon + mood label
 
-## 기여
-PR / Issue 환영. 경량 & 무상태 지향. 큰 외부 의존성 추가는 사전 논의 권장.
+**Planned**
+- Dual mood profiles (Calm / Focus) with preset weights & palettes
+- Battery time-remaining estimate badge
+- Re-init on resume from sleep (network/disk counter recovery)
+- Accessibility: high-contrast mode detection & contrast tuning
+- Screen-edge snapping / multi-monitor position correction
 
-## 라이선스
-본 프로젝트는 커스텀 비상업적 사용 허가서(Non-Commercial License)를 따릅니다. 상업적 / 영리 목적(유료 판매, 유료 서비스 번들, 광고 수익 목적 재배포 등)으로 사용할 수 없습니다. 오픈소스/개인/교육/내부 도구 용도로는 출처(README 링크) 표시 후 자유롭게 사용/수정 가능합니다. 자세한 내용은 LICENSE 파일을 참고하세요.
+---
 
-## 후원
-토스뱅크 1001-2269-0600
-작은 후원도 개발 유지와 기능 개선에 큰 도움이 됩니다. 감사합니다!
+## 🤝 Contributing
+
+PRs and issues welcome. The project aims to stay **lightweight and stateless** — please discuss large external dependencies before adding them.
+
+## 📄 License
+
+This project uses a custom **Non-Commercial License**. Commercial / for-profit use (paid sales, paid-service bundling, ad-revenue redistribution, etc.) is **not** permitted. Free to use/modify for open-source, personal, educational, and internal-tool purposes with attribution (link back to this README). See the `LICENSE` file for details.
+
+## 💛 Support
+
+Toss Bank `1001-2269-0600` — even a small tip genuinely helps keep development going. Thank you!

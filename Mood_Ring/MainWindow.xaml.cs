@@ -1,1 +1,0 @@
-﻿namespace Mood_Ring { public partial class MainWindow { } }

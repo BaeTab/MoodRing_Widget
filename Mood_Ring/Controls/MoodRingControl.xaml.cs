@@ -1,71 +1,242 @@
-// ÇÁ·ÎÁ§Æ®: Mood Ring À§Á¬
-// ÆÄÀÏ: MoodRingControl.xaml.cs
-// ¼³¸í: ¸µ Ç¥Çö UserControl. Progress(0~100)¿¡ µû¶ó Path ¾ÆÅ© °»½Å.
-//       ÇâÈÄ Ãß°¡ È¿°ú(µÎ²²/Glow º¯È­, »ö»ó ¾Ö´Ï¸ÞÀÌ¼Ç) È®Àå ÁöÁ¡.
-// ÈÄ¿ø: Åä½º¹ðÅ© 1001-2269-0600
+// í”„ë¡œì íŠ¸: Mood Ring ìœ„ì ¯
+// íŒŒì¼: MoodRingControl.xaml.cs
+// ì„¤ëª…: ë¬´ë“œ ë§ í‘œì‹œ UserControl. Progress(0~100)ë¡œ ì•„í¬ë¥¼ ê·¸ë¦¬ê³ ,
+//       RingColor/GlowIntensity/MoodBandì— ë”°ë¼ ìƒ‰ ì „í™˜Â·ê¸€ë¡œìš° í˜¸í¡Â·ê³¼ì—´ ìƒ¤ì´ë¨¸ë¥¼ ì—°ì¶œ.
+// í›„ì›: í† ìŠ¤ë±…í¬ 1001-2269-0600
 // ----------------------------------------------------------------------------------
 using System;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using Color = System.Windows.Media.Color;   // WinFormsì™€ ëª¨í˜¸ì„± ì œê±°
+using Point = System.Windows.Point;
 
 namespace Mood_Ring.Controls;
 
 public partial class MoodRingControl : System.Windows.Controls.UserControl
 {
-    // ÀÇÁ¸ ¼Ó¼º: ÁøÇà·ü (CompositeScore ¹ÙÀÎµù ´ë»ó)
+    private readonly SolidColorBrush _ringBrush = new(Colors.Teal);   // ì§„í–‰ ì•„í¬/ê¸€ë¡œìš° ê³µìœ  (ì• ë‹ˆë©”ì´ì…˜ ëŒ€ìƒ)
+    private readonly SolidColorBrush _cometBrush = new(Colors.White); // ì½”ë©§(ì•„í¬ ë ì )
+    private Storyboard? _pulse; // ê¸€ë¡œìš° í˜¸í¡
+    private Storyboard? _spin;  // ìƒ¤ì´ë¨¸ íšŒì „
+
+    // â”€â”€ DependencyProperty ì •ì˜ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public static readonly DependencyProperty ProgressProperty = DependencyProperty.Register(
         nameof(Progress), typeof(double), typeof(MoodRingControl),
-        new PropertyMetadata(0.0, OnProgressChanged));
+        new PropertyMetadata(0.0, (d, e) => ((MoodRingControl)d).UpdateArc((double)e.NewValue)));
+    public double Progress { get => (double)GetValue(ProgressProperty); set => SetValue(ProgressProperty, value); }
 
-    public double Progress
-    {
-        get => (double)GetValue(ProgressProperty);
-        set => SetValue(ProgressProperty, value);
-    }
+    public static readonly DependencyProperty RingColorProperty = DependencyProperty.Register(
+        nameof(RingColor), typeof(Color), typeof(MoodRingControl),
+        new PropertyMetadata(Colors.Teal, (d, e) => ((MoodRingControl)d).ApplyColor((Color)e.NewValue)));
+    public Color RingColor { get => (Color)GetValue(RingColorProperty); set => SetValue(RingColorProperty, value); }
 
-    private static void OnProgressChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is MoodRingControl c) c.UpdateArc((double)e.NewValue);
-    }
+    public static readonly DependencyProperty GlowIntensityProperty = DependencyProperty.Register(
+        nameof(GlowIntensity), typeof(double), typeof(MoodRingControl),
+        new PropertyMetadata(0.42, (d, e) => ((MoodRingControl)d).ApplyGlow((double)e.NewValue)));
+    public double GlowIntensity { get => (double)GetValue(GlowIntensityProperty); set => SetValue(GlowIntensityProperty, value); }
+
+    public static readonly DependencyProperty MoodBandProperty = DependencyProperty.Register(
+        nameof(MoodBand), typeof(int), typeof(MoodRingControl),
+        new PropertyMetadata(0, (d, e) => ((MoodRingControl)d).ApplyBand((int)e.NewValue)));
+    public int MoodBand { get => (int)GetValue(MoodBandProperty); set => SetValue(MoodBandProperty, value); }
+
+    public static readonly DependencyProperty AnimateColorProperty = DependencyProperty.Register(
+        nameof(AnimateColor), typeof(bool), typeof(MoodRingControl), new PropertyMetadata(true));
+    public bool AnimateColor { get => (bool)GetValue(AnimateColorProperty); set => SetValue(AnimateColorProperty, value); }
 
     public MoodRingControl()
     {
         InitializeComponent();
-        Loaded += (_, __) => UpdateArc(Progress); // Ã¹ ·»´õ ½Ã ¾ÆÅ© °è»ê
-        SizeChanged += (_, __) => UpdateArc(Progress); // ¸®»çÀÌÁî ´ëÀÀ
+        ProgressPath.Stroke = _ringBrush;
+        Glow.Stroke = _ringBrush;
+        Comet.Fill = _cometBrush;
+        Loaded += (_, __) =>
+        {
+            Relayout();
+            StartPulse();
+            ApplyColor(RingColor);
+            ApplyGlow(GlowIntensity);
+            ApplyBand(MoodBand);
+        };
+        SizeChanged += (_, __) => Relayout();
     }
 
+    private double Size => Math.Min(
+        (double.IsNaN(ActualWidth) || ActualWidth <= 0) ? Width : ActualWidth,
+        (double.IsNaN(ActualHeight) || ActualHeight <= 0) ? Height : ActualHeight);
+
+    private void Relayout()
+    {
+        BuildTicks();
+        UpdateArc(Progress);
+    }
+
+    // 60ê°œ ëˆˆê¸ˆ (5ì˜ ë°°ìˆ˜ëŠ” ê¸¸ê²Œ) â€” íŠ¸ëž™ ì•ˆìª½ì— ì€ì€í•˜ê²Œ
+    private void BuildTicks()
+    {
+        double size = Size;
+        if (size <= 0 || double.IsNaN(size) || Ticks == null) return;
+        double thickness = 9;
+        double ringR = (size - thickness) / 2.0;
+        double tickOuter = ringR - thickness / 2.0 - 2;
+        if (tickOuter <= 4) { Ticks.Data = null; return; }
+        double cx = size / 2.0, cy = size / 2.0;
+        var geo = new GeometryGroup();
+        for (int i = 0; i < 60; i++)
+        {
+            bool major = i % 5 == 0;
+            double len = major ? 6 : 3;
+            double ri = Math.Max(2, tickOuter - len);
+            double a = i / 60.0 * 2 * Math.PI;
+            var p1 = new Point(cx + tickOuter * Math.Sin(a), cy - tickOuter * Math.Cos(a));
+            var p2 = new Point(cx + ri * Math.Sin(a), cy - ri * Math.Cos(a));
+            geo.Children.Add(new LineGeometry(p1, p2));
+        }
+        geo.Freeze();
+        Ticks.Data = geo;
+    }
+
+    // ì§„í–‰ ì•„í¬ (12ì‹œ ì‹œìž‘, ì‹œê³„ë°©í–¥)
     private void UpdateArc(double value)
     {
-        if (ProgressPath == null) return; // XAML ¿ä¼Ò ¾ÆÁ÷ »ý¼º ¾È µÈ °æ¿ì
-        double w = ActualWidth; if (double.IsNaN(w) || w <= 0) w = Width; if (w <= 0) return;
-        double h = ActualHeight; if (double.IsNaN(h) || h <= 0) h = Height; if (h <= 0) return;
-        double size = Math.Min(w, h);
-        double thickness = ProgressPath.StrokeThickness; // StrokeThickness ±â¹Ý ¹ÝÁö¸§ »êÁ¤
-        double r = (size - thickness) / 2.0;              // ³»ºÎ °æ°è °í·Á
-        double cx = size / 2.0;
-        double cy = size / 2.0;
-        double angle = value / 100.0 * 360.0;             // Á¡¼ö ¡æ °¢µµ(µµ)
+        if (ProgressPath == null) return;
+        double size = Size;
+        if (size <= 0 || double.IsNaN(size)) return;
+        double thickness = ProgressPath.StrokeThickness;
+        double r = (size - thickness) / 2.0;
+        if (r <= 0) return;
+        double cx = size / 2.0, cy = size / 2.0;
+        value = Math.Clamp(value, 0, 100);
+        double angle = value / 100.0 * 360.0;
 
         if (angle < 0.01)
         {
-            ProgressPath.Data = Geometry.Parse($"M{cx},{cy - r}"); // ½ÃÀÛÁ¡¸¸ (0%)
+            var dot = Geometry.Parse($"M{F(cx)},{F(cy - r)}");
+            dot.Freeze();
+            ProgressPath.Data = dot;
+            SheenPath.Data = dot;
+            Comet.Visibility = Visibility.Collapsed;
             return;
         }
+
+        Geometry g;
         if (angle > 359.9)
         {
-            // 100%: ÀüÃ¼ ¿ø (EllipseGeometry »ç¿ë ¡æ ·»´õ ÃÖÀûÈ­)
-            ProgressPath.Data = new EllipseGeometry(new System.Windows.Point(cx, cy), r, r);
-            return;
+            g = new EllipseGeometry(new Point(cx, cy), r, r);
         }
+        else
+        {
+            double rad = Math.PI / 180.0 * angle;
+            double ex = cx + r * Math.Sin(rad);
+            double ey = cy - r * Math.Cos(rad);
+            bool large = angle > 180;
+            g = Geometry.Parse($"M{F(cx)},{F(cy - r)} A{F(r)},{F(r)} 0 {(large ? 1 : 0)} 1 {F(ex)},{F(ey)}");
+        }
+        g.Freeze();
+        ProgressPath.Data = g;
+        SheenPath.Data = g;
 
-        // ³¡Á¡ ÁÂÇ¥ (12½Ã ±âÁØ ½Ã°è¹æÇâ)
-        double rad = (Math.PI / 180.0) * angle;
-        double ex = cx + r * Math.Sin(rad);
-        double ey = cy - r * Math.Cos(rad);
-        bool largeArc = angle > 180; // 180µµ ÃÊ°ú ¿©ºÎ
-
-        string data = $"M{cx},{cy - r} A{r},{r} 0 {(largeArc ? 1 : 0)} 1 {ex},{ey}"; // ¸í·É: Move + Arc
-        try { ProgressPath.Data = Geometry.Parse(data); } catch { /* ÆÄ½Ì ½ÇÆÐ½Ã ¹«½Ã */ }
+        // ì½”ë©§ì„ ì•„í¬ ëì— ë°°ì¹˜
+        double rad2 = Math.PI / 180.0 * angle;
+        double tx = cx + r * Math.Sin(rad2);
+        double ty = cy - r * Math.Cos(rad2);
+        Comet.Visibility = Visibility.Visible;
+        Comet.Margin = new Thickness(tx - Comet.Width / 2, ty - Comet.Height / 2, 0, 0);
     }
+
+    // ìƒ‰ ì „í™˜ (ì˜µì…˜ì— ë”°ë¼ eased ì• ë‹ˆë©”ì´ì…˜ / ì¦‰ì‹œ ì ìš©)
+    private void ApplyColor(Color c)
+    {
+        var bright = Lighten(c, 0.4);
+        if (AnimateColor && IsLoaded)
+        {
+            var dur = new Duration(TimeSpan.FromMilliseconds(360));
+            _ringBrush.BeginAnimation(SolidColorBrush.ColorProperty,
+                new ColorAnimation(c, dur) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } });
+            _cometBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(bright, dur));
+        }
+        else
+        {
+            _ringBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+            _ringBrush.Color = c;
+            _cometBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+            _cometBrush.Color = bright;
+        }
+    }
+
+    // ê¸€ë¡œìš° ê°•ë„ (ì ìˆ˜ ê¸°ë°˜) â€” ë¶ˆíˆ¬ëª…ë„ + ë²ˆì§ ë°˜ê²½
+    private void ApplyGlow(double intensity)
+    {
+        intensity = Math.Clamp(intensity, 0.15, 0.95);
+        if (IsLoaded)
+            Glow.BeginAnimation(OpacityProperty, new DoubleAnimation(intensity, new Duration(TimeSpan.FromMilliseconds(500))));
+        else
+            Glow.Opacity = intensity;
+        if (GlowBlur != null) GlowBlur.Radius = 12 + intensity * 16;
+    }
+
+    // ë°´ë“œ(0~3): íŽ„ìŠ¤ ì†ë„ + ìƒ¤ì´ë¨¸ ë…¸ì¶œ/íšŒì „
+    private void ApplyBand(int band)
+    {
+        band = Math.Clamp(band, 0, 3);
+        double ratio = band switch { 0 => 0.6, 1 => 0.9, 2 => 1.3, _ => 1.9 };
+        try { _pulse?.SetSpeedRatio(this, ratio); } catch { }
+
+        double targetOpacity = band >= 3 ? 0.55 : (band == 2 ? 0.18 : 0.0);
+        if (IsLoaded)
+            Shimmer.BeginAnimation(OpacityProperty, new DoubleAnimation(targetOpacity, new Duration(TimeSpan.FromMilliseconds(500))));
+        else
+            Shimmer.Opacity = targetOpacity;
+
+        if (band >= 2) StartSpin(band);
+        else StopSpin();
+    }
+
+    private void StartPulse()
+    {
+        if (_pulse != null) return;
+        var dur = new Duration(TimeSpan.FromSeconds(1.7));
+        var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+        var ax = new DoubleAnimation(1.0, 1.06, dur) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
+        var ay = ax.Clone();
+        Storyboard.SetTargetName(ax, "GlowScale");
+        Storyboard.SetTargetProperty(ax, new PropertyPath(ScaleTransform.ScaleXProperty));
+        Storyboard.SetTargetName(ay, "GlowScale");
+        Storyboard.SetTargetProperty(ay, new PropertyPath(ScaleTransform.ScaleYProperty));
+        _pulse = new Storyboard();
+        _pulse.Children.Add(ax);
+        _pulse.Children.Add(ay);
+        try { _pulse.Begin(this, true); } catch { _pulse = null; }
+    }
+
+    private void StartSpin(int band)
+    {
+        if (_spin == null)
+        {
+            var a = new DoubleAnimation(0, 360, new Duration(TimeSpan.FromSeconds(7.0))) { RepeatBehavior = RepeatBehavior.Forever };
+            Storyboard.SetTargetName(a, "ShimmerRot");
+            Storyboard.SetTargetProperty(a, new PropertyPath(RotateTransform.AngleProperty));
+            _spin = new Storyboard();
+            _spin.Children.Add(a);
+            try { _spin.Begin(this, true); } catch { _spin = null; return; }
+        }
+        try { _spin.SetSpeedRatio(this, band >= 3 ? 2.0 : 1.0); } catch { }
+    }
+
+    private void StopSpin()
+    {
+        if (_spin == null) return;
+        try { _spin.Stop(this); } catch { }
+        _spin = null; // ë³´ì´ì§€ ì•Šì„ ë•Œ íšŒì „ í´ëŸ­ í•´ì œ (ì• ë‹ˆë©”ì´ì…˜ ìŠ¤ë ˆë“œ ë¶€ë‹´ ì œê±°)
+    }
+
+    private static Color Lighten(Color c, double amt)
+    {
+        byte L(byte v) => (byte)(v + (255 - v) * amt);
+        return Color.FromRgb(L(c.R), L(c.G), L(c.B));
+    }
+
+    private static string F(double d) => d.ToString(CultureInfo.InvariantCulture);
 }

@@ -1,85 +1,111 @@
-// ÇÁ·ÎÁ§Æ®: Mood Ring À§Á¬
-// ÆÄÀÏ: TrayService.cs
-// ¼³¸í: ½Ã½ºÅÛ Æ®·¹ÀÌ(NotifyIcon) ¾ÆÀÌÄÜ »ı¼º ¹× ÄÁÅØ½ºÆ® ¸Ş´º ±¸¼º.
-//       °£´ÜÇÑ ¸µ ÇüÅÂ ¾ÆÀÌÄÜÀ» µ¿ÀûÀ¸·Î ±×·Á HICON º¯È¯ ÈÄ Ç¥½Ã.
-// ÈÄ¿ø: Åä½º¹ğÅ© 1001-2269-0600
+// í”„ë¡œì íŠ¸: Mood Ring ìœ„ì ¯
+// íŒŒì¼: TrayService.cs
+// ì„¤ëª…: ì‹œìŠ¤í…œ íŠ¸ë ˆì´(NotifyIcon) ì•„ì´ì½˜ ë° ì»¨í…ìŠ¤íŠ¸ ë©”ë‰´. ì ìˆ˜ ìƒ‰ì„ ë°˜ì˜í•œ ë™ì  ì•„ì´ì½˜ ê°±ì‹ .
+//       ë©”ë‰´ ë™ì‘ì€ ITrayHost(RingWindow)ì— ìœ„ì„.
+// í›„ì›: í† ìŠ¤ë±…í¬ 1001-2269-0600
 // ----------------------------------------------------------------------------------
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using Mood_Ring.Models;
+using MediaColor = System.Windows.Media.Color;
 
 namespace Mood_Ring.Services;
 
+// íŠ¸ë ˆì´ ë©”ë‰´ê°€ í˜¸ì¶œí•˜ëŠ” ë™ì‘/ìƒíƒœ (RingWindowê°€ êµ¬í˜„)
+public interface ITrayHost
+{
+    void ToggleVisibility();
+    void SetSizePreset(double size);
+    void OpenSettings();
+    void ToggleLock();
+    void ToggleClickThrough();
+    void ToggleAutostart();
+    bool IsLocked { get; }
+    bool IsClickThrough { get; }
+    bool IsAutostart { get; }
+}
+
 public class TrayService : IDisposable
 {
-    private NotifyIcon? _icon;                      // Æ®·¹ÀÌ ¾ÆÀÌÄÜ °´Ã¼
-    private readonly SettingsService _settingsService; // ¼³Á¤ ¼­ºñ½º (Å©±â º¯°æ µî ¹İ¿µ)
-    private readonly Action _toggleVisibility;       // Ç¥½Ã/¼û±è Åä±Û ¾×¼Ç
-    private readonly Action<double> _setSize;        // Å©±â Á¶Á¤ ¾×¼Ç
-    private readonly Action _saveSettings;           // ¼³Á¤ ÀúÀå ¾×¼Ç
-    private readonly Action _toggleLock;             // Àá±İ Åä±Û ¾×¼Ç
-
-    private IntPtr _hIcon = IntPtr.Zero;             // »ı¼ºµÈ HICON ÇÚµé (¼öµ¿ ÇØÁ¦ ÇÊ¿ä)
+    private NotifyIcon? _icon;
+    private readonly ITrayHost _host;
+    private IntPtr _hIcon = IntPtr.Zero; // í˜„ì¬ ì•„ì´ì½˜ HICON (ìˆ˜ë™ í•´ì œ í•„ìš”)
+    private int _lastColorKey = -1;       // ìƒ‰ ë³€í™” ê°ì§€(ë¶ˆí•„ìš”í•œ ì¬ìƒì„± ë°©ì§€)
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr hIcon);
 
-    public TrayService(SettingsService settingsService, Action toggleVisibility, Action<double> setSize, Action saveSettings, Action toggleLock)
-    {
-        _settingsService = settingsService;
-        _toggleVisibility = toggleVisibility;
-        _setSize = setSize;
-        _saveSettings = saveSettings;
-        _toggleLock = toggleLock;
-    }
+    public TrayService(ITrayHost host) => _host = host;
 
     public void Init()
     {
-        var icon = CreateRingIcon();
         _icon = new NotifyIcon
         {
             Text = "Mood Ring",
-            Icon = icon,
-            Visible = true,
-            ContextMenuStrip = BuildMenu()
+            Icon = BuildIcon(MediaColor.FromRgb(45, 212, 191), 0.4),
+            Visible = true
         };
+        var menu = new ContextMenuStrip();
+        menu.Opening += (_, __) => RebuildMenu(menu); // ì—´ ë•Œë§ˆë‹¤ ì²´í¬ ìƒíƒœ ê°±ì‹ 
+        _icon.ContextMenuStrip = menu;
+        _icon.DoubleClick += (_, __) => _host.ToggleVisibility();
     }
 
-    private Icon CreateRingIcon()
+    private void RebuildMenu(ContextMenuStrip menu)
     {
-        // 32x32 Åõ¸í ¹è°æ ºñÆ®¸Ê¿¡ ¿Ü°û ¸µ + ºÎºĞ ¾ÆÅ©¸¦ ±×·Á ½Éº¼È­
-        int size = 32;
-        var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        menu.Items.Clear();
+        menu.Items.Add("í‘œì‹œ / ìˆ¨ê¸°ê¸°", null, (_, __) => _host.ToggleVisibility());
+        menu.Items.Add("ì„¤ì •â€¦", null, (_, __) => _host.OpenSettings());
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(new ToolStripMenuItem("ì ê¸ˆ", null, (_, __) => _host.ToggleLock()) { Checked = _host.IsLocked });
+        menu.Items.Add(new ToolStripMenuItem("í´ë¦­ í†µê³¼", null, (_, __) => _host.ToggleClickThrough()) { Checked = _host.IsClickThrough });
+        menu.Items.Add(new ToolStripMenuItem("ìœˆë„ìš° ì‹œì‘ ì‹œ ì‹¤í–‰", null, (_, __) => _host.ToggleAutostart()) { Checked = _host.IsAutostart });
+
+        var sizeMenu = new ToolStripMenuItem("í¬ê¸°");
+        foreach (var s in new[] { 100, 120, 140, 160 })
+            sizeMenu.DropDownItems.Add(s + "px", null, (_, __) => _host.SetSizePreset(s));
+        menu.Items.Add(sizeMenu);
+
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("ì¢…ë£Œ", null, (_, __) => System.Windows.Application.Current.Shutdown());
+    }
+
+    // ì ìˆ˜ ìƒ‰ìœ¼ë¡œ íŠ¸ë ˆì´ ì•„ì´ì½˜ ê°±ì‹  (ì‘ì€ ë§ + ì§„í–‰ ì•„í¬)
+    public void UpdateIcon(MediaColor c, double fill)
+    {
+        if (_icon == null) return;
+        int key = ((c.R >> 5) << 10) | ((c.G >> 5) << 5) | (c.B >> 5);
+        if (key == _lastColorKey) return; // ìƒ‰ ë³€í™” ë¯¸ë¯¸í•˜ë©´ ìŠ¤í‚µ
+        _lastColorKey = key;
+
+        var old = _hIcon;
+        _icon.Icon = BuildIcon(c, fill); // ë‚´ë¶€ì—ì„œ _hIcon ê°±ì‹ 
+        if (old != IntPtr.Zero) DestroyIcon(old);
+    }
+
+    private Icon BuildIcon(MediaColor c, double fill)
+    {
+        const int size = 32;
+        using var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(bmp))
         {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(Color.Transparent);
-            var outerRect = new Rectangle(2, 2, size - 4, size - 4);
-            using var outerPen = new Pen(Color.FromArgb(255, 45, 212, 191), 5); // #2dd4bf - º£ÀÌ½º Åæ
-            g.DrawEllipse(outerPen, outerRect);
-            using var innerPen = new Pen(Color.FromArgb(255, 132, 204, 22), 3); // #84cc16 - ÁøÇà ´À³¦
-            g.DrawArc(innerPen, outerRect, -90, 220); // 220µµ ¾ÆÅ© (ÀÓÀÇ ÁøÇà·ü Ç¥Çö)
+            var rect = new Rectangle(4, 4, size - 8, size - 8);
+            using (var track = new Pen(Color.FromArgb(90, 120, 130, 150), 5))
+                g.DrawEllipse(track, rect);
+            using var pen = new Pen(Color.FromArgb(255, c.R, c.G, c.B), 5)
+            {
+                StartCap = LineCap.Round,
+                EndCap = LineCap.Round
+            };
+            float sweep = (float)(Math.Clamp(fill, 0, 1) * 360.0);
+            if (sweep > 0.5f) g.DrawArc(pen, rect, -90, sweep);
         }
         _hIcon = bmp.GetHicon();
         return Icon.FromHandle(_hIcon);
-    }
-
-    private ContextMenuStrip BuildMenu()
-    {
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("Ç¥½Ã/¼û±â±â", null, (_,__)=> _toggleVisibility());
-        menu.Items.Add("Àá±İ Åä±Û", null, (_,__)=> { _toggleLock(); });
-        var sizeMenu = new ToolStripMenuItem("Å©±â");
-        foreach (var s in new[]{100,120,140})
-        {
-            sizeMenu.DropDownItems.Add(s+"px", null, (_,__)=> { _setSize(s); _saveSettings(); });
-        }
-        menu.Items.Add(sizeMenu);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Á¾·á", null, (_,__)=> { System.Windows.Application.Current.Shutdown(); });
-        return menu;
     }
 
     public void Dispose()
